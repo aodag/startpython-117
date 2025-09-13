@@ -1,0 +1,344 @@
+#+TITLE: pylock.tomlでパッケージングツールはどうなるか？
+#+BEAMER_THEME: Boadilla
+#+BEAMER_COLOR_THEME: seahorse
+#+OPTIONS: H:2 toc:nil num:t
+#+OPTIONS: ^:{}
+#+LaTeX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=169]
+#+LaTeX_HEADER: \usepackage{luatexja}
+#+COLUMNS: %45ITEM %10BEAMER_ENV(Env) %10BEAMER_ACT(Act) %4BEAMER_COL(Col)
+
+* はじめに
+
+** COMMENT summary
+PEP751にてpylock.tomlがacceptされパッケージングツールが使うファイルはpyproject.toml, pylock.tomlに集約されることになります。
+これまでPythonプロジェクトに置かれていたファイルたちを振り返りながら、pyproject.toml, pylock.tomlに集約される情報を確認してみましょう。
+また、pylock.tomlがどのような内容を持って作られ、パッケージインストールに利用されるのかについても見ていきます。
+
+** 自己紹介 (aka おまえだれよ)
+
+- aodag
+- Atsushi Odagiri
+- 株式会社オープンコレクター
+
+** 今日のお話
+
+- pylock.tomlとバージョンロック
+- pylock.tomlを作る、使う
+
+* pylock.tomlとバージョンロックが必要な理由
+
+** PEP751
+
+- PEP 751 – A file format to record Python dependencies for installation reproducibility
+- 開発環境を再構築できるように依存ライブラリを記録するためのファイル
+  - ~= pylock.toml~
+
+** 標準的なファイルフォーマットが必要な理由
+
+- ツールごとにバージョンロックのファイル形式が異なる
+  - プロジェクトごとに開発しては非効率
+  - ツール移行の障壁
+
+** バージョンロックが必要な理由
+
+- 環境構築の再現性
+- パッケージ作成とは関係ない
+
+* バージョンロックとは？
+
+** pyproject.toml と pylock.toml
+
+- pyproject.toml
+  - 開発プロジェクトのメタデータと依存ライブラリ
+  - 直接依存を書く
+    - 間接依存しているライブラリが要らなくなることも
+  - 配布する場合様々なライブラリとともに使われる
+    - 必要な範囲のバージョン指定
+    - 過剰に環境構築の再現性を持たせない
+- pylock.toml
+  - 間接依存を含めてすべての依存ライブラリ
+  - バージョンを一意に固定
+  - 環境構築の再現性
+
+** pylock.toml以前のバージョンロック
+
+- buildout-versions, versions.cfg
+  - known good set, kgs
+- pip freeze, requirements.txt, constraints.txt
+- pip-tool, requirements.in
+- Pipfile.lock
+- poetry.lock, uv.lock
+
+** pip freeze, requirements.txt, constraints.txt
+
+- ~pip freeze~ の結果は情報が少ない
+  - パッケージ名
+  - バージョン
+- dependency line形式(PEP 508)まで許されるが追加可能な情報はextrasのみ
+- 明示的に ~pip freeze~ しないと更新されない
+  - ツールが自動でやってくれないと忘れる
+- 直接依存と間接依存を取り違えがち
+- 開発向けのテストツールへの依存などを分ける方法がイマイチ
+  - dev_requires.txtなどにわけるなどしても若干使いにくい
+
+** buildout-versions
+
+- buildoutが自動更新してくれる
+- パッケージ名とバージョンくらいしか記録しない
+- ある程度は間接依存であることを記録してくれる
+  - コメントなので実効性は低い
+- buildoutを使うプロジェクトが少ない
+
+** poetry.lock, uv.lock
+
+- ツールで自動更新
+- ~pyproject.toml~ の直接依存記述と分離
+- ダウンロード元などの情報あり
+- ハッシュなども記録している
+- 作るのも使うのもツール依存
+
+** pylock.tomlのサポート状況
+- 現時点サポートは uvのみ？ [[https://github.com/astral-sh/uv/issues/12584][uv#12584]]
+  - PDMもサポートしている模様 [[https://github.com/pdm-project/pdm/issues/3439][pdm#3439]]
+- pipサポート待ち [[https://github.com/pypa/pip/pull/13369][pip#13369]]
+
+* 実践pylock.toml
+
+** pylock.toml を作る
+
+- 依存ライブラリのパッケージ名とバージョン
+  - constraints.txt などの過去のフォーマットによるバージョンロック情報から変換
+  - pip freeze同様に今インストールされているライブラリから生成
+  - ~pyproject.toml~ の直接依存から抽出
+
+** pylock.tomlに必要な情報の取得元
+
+- METADATA (PEP241, 314, 345, 566)
+  - インストール済のdist-info以下
+  - wheelファイル内のdist-info以下
+  - PyPIのsimple repository API
+- ダウンロードURL
+  - PyPIのsimple repository API
+
+** pylock.tomlをconstraints.txtから作成してみる
+
+- zopeのconstraints.txt を例に進めます
+  - dependency line (PEP 508)
+  - known good set
+  - zope foundationがバージョンロックファイルを管理している
+
+** dependency line おさらいと追加
+
+- PEP 508 で決まってる
+- ~pip freeze~ で出てくる
+- ~pyproject.toml~ の ~project.dependencies~ で使う
+- ~pylock.toml~ 内では使わない
+
+** dependenciy lineを読み解こう
+
+#+BEGIN_example
+requests [security,tests] >= 2.8.1, == 2.8.* ; python_version < "2.7"
+#+END_example
+
+- name: ~requests~
+  - パッケージ名
+- extras: ~ecurity~ ~tests~
+  - 追加機能の指定
+  - 追加機能によって依存ライブラリが増える
+- version: ~>= 2.8.1~ ~== 2.8.*~
+  - バージョン指定(PEP440)
+- environment marker: ~python_version < 2.7~
+  - インストール先の環境の条件
+  - 他には ~os_name == 'linux'~ や ~platform_implementation == 'cpython'~ など
+
+** PyPIを読みに行く
+
+- simple repository API
+  - ~/simple/{project}~
+  - もともとはただのhtmlリンク
+  - JSON APIもあるが同じ情報量
+    - 大したこと書いてない
+  - JSONレスポンス ~files~ にダウンロード情報、HTMLレスポンスだとただただリンクがある
+    - がんばって意味のあるURLを探す
+  - 意味のあるURL
+    - sdistやwheelファイルへのリンクURL
+
+** simple repository files
+
+- *歴史的な理由により* filesにはsdist, wheel以外のファイルも入ってる可能性がある
+- 結構雑然と並んでるだけ
+- ファイル名フォーマットからsdist, wheelであるか判定しつつメタデータを取得する
+
+** simple repository files wheelの場合
+
+#+BEGIN_src javascript
+  {
+    ...
+    "data-dist-info-metadata": {
+      "sha256": "e399159...2687c41ce2"
+    },
+    "filename": "WebDispatch-1.3-py2.py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/[..]/WebDispatch-1.3-py2.py3-none-any.whl"
+  }
+#+END_src
+
+** simple repository files sdistの場合
+
+- sdist の場合の例
+
+#+BEGIN_src javascript
+    {
+      "data-dist-info-metadata": false,
+      "filename": "WebDispatch-1.3.tar.gz",
+      "url": "https://files.pythonhosted.org/[..]/WebDispatch-1.3.tar.gz"
+    }  
+#+END_src
+
+** sdist, wheel ファイル名の意味
+
+pylock.toml作るのに必要なのはdistributiionとversionなので、他のフィールドは気にしない
+
+- wheel PEP491
+  - ~{distribution}-{version}(-{build tag})?-{python tag}-{abi tag}-{platform tag}.whl~
+- sdist PEP 625
+  - ~{distribution}-{version}.tar.gz~
+
+
+** メタデータを取得する
+
+- simple repository API から取得
+  - ~files[].metadata~ にhashdigitが入ってるならメタデータをダウンロード可能
+  - ~{files[].url}.metadata~ からダウンロード
+- なければsdistやwheelファイルをダウンロードして中を見る
+  - wheelなら ~{distribution}.dist-info/METADATA~
+  - sdistなら ~METADATA~ を作成させる
+    - PEP517 ~prepare_metadata_for_build_wheel~, ~build_wheel~ などを実行
+
+** METADATA
+
+- WebDispatch-1.3-py2.py3-none-any.whl.metadata の例
+
+#+BEGIN_example
+Metadata-Version: 2.0
+Name: WebDispatch
+Version: 1.3
+...
+Requires-Dist: pytest; extra == 'testing'
+Requires-Dist: pytest-cov; extra == 'testing'
+Requires-Dist: testfixtures; extra == 'testing'
+Requires-Dist: webtest; extra == 'testing'
+#+END_example
+
+** METADATAファイルのパース
+
+- MIME Header形式
+- email.parserを使う
+- 複数回利用可能なフィールド (Required-Distなど) がある
+
+** 余談: toml dump
+
+- 標準ライブラリのtomllibはparseだけ
+  - tomlkitあたりが必要
+- prestyled editingが欲しくなるので結局はtomlkitを使う
+
+** さあpylock.tomlだ
+
+- packages
+  - name: MATADATA.Name
+  - version: METADATA.Version
+  - dependencies: METADATA.Requires-Dist
+  - requires-python: METADATA.Requires-Python
+  - wheels or sdist ...
+    - pypi.project.files[].name
+    - pypi.project.files[].url
+  - index: pypi.url
+
+** pylock.toml
+
+- zope5.3の constraints.txtから作成したpylock.toml
+
+** COMMENT pylock.tomlからインストールしてみよう
+
+- wheelを優先してダウンロード
+- sdistの場合はwheel build(PEP517)
+- wheelファイルを一時ディレクトリに展開
+- ここまではマルチスレッドでいける
+- 名前空間パッケージ(PEP420)ごとにsite-packagesに移動
+
+* まとめ
+** pylock.tomlでパッケージングツールはどうなるか？
+- パッケージの作り方は変わらない
+  - PEP517/518で定義済
+- インストーラーが助かる
+  - ~requirements.txt~ などより豊富な情報
+  - 使う側として重要
+  - 環境構築再現性の向上
+
+** pyproject.toml と pylock.toml
+
+- ~pyproject.toml~, ~pylock.toml~ をセットで使うか ~pylock.toml~ 単体で使うか
+  - インストールするときは ~pylock.toml~ だけの情報でも十分
+  - 手作業で編集しないほうがよさそう
+    - ツールでやるとなるとセットで扱うものが多いのでは
+    - pip が ~pylock.toml~ 単体で扱うかもしれない
+
+** パッケージング関連に残る課題
+
+- Simple Repository
+  - セキュリティ 電子署名
+  - アップロードAPI
+  - プロジェクト名前空間
+- PyPIのパッケージ信頼性
+    
+** COMMENT パッケージング関連での愚痴
+
+- 正規化の方法が複数あるのなんとかならんか
+  - パッケージ正規化 ~-~
+    - zope.interface -> zope-interface
+  - wheelファイル名正規化 ~_~
+    - zope.interface -> zope_interface
+
+** COMMENT パッケージング関連での愚痴
+- ファイル形式が複数あるのなんとかならんか
+  - RECORD
+    - CSV
+  - METADATA
+    - MIME Header
+  - simple repository HTML API
+    - HTML
+  - simple repository json API
+    - JSON
+  - pyproject.toml
+    - TOML
+
+** COMMENT パッケージング関連での愚痴
+- pipだろうがuvだろうがPEPに従ってないならそれは間違いです
+- 便利な機能があって、それがPEPで提案されてないならそれは別の形で標準化される可能性がある
+  - setuptoolsにあった機能はPEPで違う形で取り込まれてきた
+- 普通に使うのにPEP読む必要があるとかおかしい
+
+* 参考資料
+
+** ツールやガイド
+
+- [[https://packaging.python.org/][Python Packaging User Guide]]
+- [[https://github.com/python-poetry/poetry][Poetry: Python packaging and dependency management made easy]]
+- [[https://github.com/astral-sh/uv][uv An extremely fast Python package and project manager, written in Rust.]]
+- [[https://pythonhosted.org/buildout-versions/index.html][Buildout Versions documentation]]
+- [[https://download.zope.dev/zope3.4/][Zope 3 Known Good Sets]]
+
+** PEPs
+- [[https://peps.python.org/pep-0376/][PEP 376 – Database of Installed Python Distributions]]
+- [[https://peps.python.org/pep-0420/][PEP 420 – Implicit Namespace Packages]]
+- [[https://peps.python.org/pep-0491/][PEP 491 – The Wheel Binary Package Format 1.9]]
+- [[https://peps.python.org/pep-0508/][PEP 508 – Dependency specification for Python Software Packages]]
+- [[https://peps.python.org/pep-0517/][PEP 517 – A build-system independent format for source trees]]
+- [[https://peps.python.org/pep-0518/][PEP 518 – Specifying Minimum Build System Requirements for Python Projects]]
+- [[https://peps.python.org/pep-0625/][PEP 625 – Filename of a Source Distribution]]
+- [[https://peps.python.org/pep-0627/][PEP 627 – Recording installed projects]]
+- [[https://peps.python.org/pep-0658/][PEP 658 – Serve Distribution Metadata in the Simple Repository API]]
+- [[https://peps.python.org/pep-0691/][PEP 691 – JSON-based Simple API for Python Package Indexes]]
+- [[https://peps.python.org/pep-0700/][PEP 700 – Additional Fields for the Simple API for Package Indexes]]
+- [[https://peps.python.org/pep-0714/][PEP 714 – Rename dist-info-metadata in the Simple API]]
+- [[https://peps.python.org/pep-0751/][PEP 751 – A file format to record Python dependencies for installation reproducibility]]
