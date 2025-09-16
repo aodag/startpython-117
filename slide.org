@@ -123,7 +123,7 @@ PEP751にてpylock.tomlがacceptされパッケージングツールが使うフ
 
 ** pylock.tomlをconstraints.txtから作成してみる
 
-- zopeのconstraints.txt を例に進めます
+- zopeの [[https://github.com/aodag/startpython-117/blob/main/constraints.txt][constraints.txt]] を例に進めます
   - dependency line (PEP 508)
   - known good set
   - zope foundationがバージョンロックファイルを管理している
@@ -256,7 +256,7 @@ Requires-Dist: webtest; extra == 'testing'
 
 ** pylock.toml
 
-- zope5.3の constraints.txtから作成したpylock.toml
+- zope5.3の constraints.txtから作成した [[https://github.com/aodag/startpython-117/blob/main/pylock.toml][pylock.toml]]
 
 ** COMMENT pylock.tomlからインストールしてみよう
 
