@@ -100,7 +100,9 @@ PEP751にてpylock.tomlがacceptされパッケージングツールが使うフ
 
 ** pylock.tomlのサポート状況
 - 現時点サポートは uvのみ？ [[https://github.com/astral-sh/uv/issues/12584][uv#12584]]
-  - PDMもサポートしている模様 [[https://github.com/pdm-project/pdm/issues/3439][pdm#3439]]
+  - ~uv export --format pylock.toml~ で生成
+  - 運用上は uv.lock を使う模様
+- PDMもサポートしている模様 [[https://github.com/pdm-project/pdm/issues/3439][pdm#3439]]
 - pipサポート待ち [[https://github.com/pypa/pip/pull/13369][pip#13369]]
 
 * 実践pylock.toml
@@ -257,6 +259,31 @@ Requires-Dist: webtest; extra == 'testing'
 ** pylock.toml
 
 - zope5.3の constraints.txtから作成した [[https://github.com/aodag/startpython-117/blob/main/pylock.toml][pylock.toml]]
+
+** extrasやgroup
+
+- extra 追加機能のための依存ライブラリ
+  - 画像表示を使いたければ pillow を追加するなど
+- group 
+  - pytestとかruffとかsphinxとか
+  - デプロイ固有の依存ライブラリをまとめるとか
+
+** pylock.tomlでのextrasやgroup
+
+- そのpylock.tomlファイルが対応しているかを ~extras~ フィールドや ~dependency-group~ フィールドで示す
+- packages以下でのextrasやgroupの指定なし
+- ファイル単位での対応
+  - pylock.toml がデフォルトだが別の名前を使える
+  - pylock.*.toml もツールは対応すべき
+  - 名前付の意味はツールに任されている
+
+** uvのextras, group
+
+- ~uv export --group testing~ などの指定
+- ~extras~ フィールドや ~dependency-group~ フィールドを出してくれない
+  - ファイル名で対応しろと
+- 生成した ~pylock.toml~ をどう使うか
+- それぞれのツールが ~pylock.toml~ をインポートするなどで相互利用可能になる...はず..
 
 ** COMMENT pylock.tomlからインストールしてみよう
 
