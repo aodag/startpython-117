@@ -285,13 +285,17 @@ Requires-Dist: webtest; extra == 'testing'
 - 生成した ~pylock.toml~ をどう使うか
 - それぞれのツールが ~pylock.toml~ をインポートするなどで相互利用可能になる...はず..
 
-** COMMENT pylock.tomlからインストールしてみよう
+** pylock.tomlからインストールしてみよう
 
-- wheelを優先してダウンロード
-- sdistの場合はwheel build(PEP517)
-- wheelファイルを一時ディレクトリに展開
-- ここまではマルチスレッドでいける
-- 名前空間パッケージ(PEP420)ごとにsite-packagesに移動
+- PEP751にはインストーラーがどのような順序でpylock.tomlからインストールすべきかが説明されています
+  - 対象のpylock.toml or pylock.*.toml がインストールしたいextrasやgroupを対象としているかチェック
+    - 指定なしはデフォルトであるとかなんとか
+  - environment markerやversion、platformなどの条件を参照しダウンロードするdistribution(wheelファイルやsdistなど)を特定
+  - urlフィールドからダウンロード
+  - sdistはPEP517に従いwheelを作成
+  - ダウンロードしたwheelや生成したwheelをPEP491に従いインストール
+- [[https://github.com/aodag/pyconmini-tokai/blob/main/slide.pdf][PyCon mini 東海 2024]] でPyPIからダウンロードしてインストールするまでの話をしております
+
 
 * まとめ
 ** pylock.tomlでパッケージングツールはどうなるか？
