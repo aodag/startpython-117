@@ -246,6 +246,8 @@ Requires-Dist: webtest; extra == 'testing'
 
 ** さあpylock.tomlだ
 
+METADATAやpypiのSimple Repository APIから集めた情報を pylock.toml スキーマに合わせて出力
+
 - packages
   - name: MATADATA.Name
   - version: METADATA.Version
@@ -258,7 +260,7 @@ Requires-Dist: webtest; extra == 'testing'
 
 ** pylock.toml
 
-- zope5.3の constraints.txtから作成した [[https://github.com/aodag/startpython-117/blob/main/pylock.toml][pylock.toml]]
+- zope5.13の constraints.txtから作成してみた [[https://github.com/aodag/startpython-117/blob/main/pylock.toml][pylock.toml]]
 
 ** extrasやgroup
 
@@ -290,8 +292,12 @@ Requires-Dist: webtest; extra == 'testing'
 - PEP751にはインストーラーがどのような順序でpylock.tomlからインストールすべきかが説明されています
   - 対象のpylock.toml or pylock.*.toml がインストールしたいextrasやgroupを対象としているかチェック
     - 指定なしはデフォルトであるとかなんとか
-  - environment markerやversion、platformなどの条件を参照しダウンロードするdistribution(wheelファイルやsdistなど)を特定
-  - urlフィールドからダウンロード
+  - ~packages[].marker~ や ~packages[].requires-python~ 、 などの条件を参照しパッケージのインストール可否を判定
+  - ~packages[].wheels~ や ~packages[].sdist~ からダウンロードするdistribution(wheelファイルやsdistなど)を特定
+    - どのwheelを使うのかはwheelファイル名から判定(PEP491)
+    - ここもフィールドに展開してあれば楽なのに！
+    - 対応するwheelがなければsdistを使う
+  - ~packages[].wheels[].url~ や ~packages[].sdist[].url~ フィールドからダウンロード
   - sdistはPEP517に従いwheelを作成
   - ダウンロードしたwheelや生成したwheelをPEP491に従いインストール
 - [[https://github.com/aodag/pyconmini-tokai/blob/main/slide.pdf][PyCon mini 東海 2024]] でPyPIからダウンロードしてインストールするまでの話をしております
